@@ -6,6 +6,7 @@ import { PdfSplitter } from '@/components/features/pdf-splitter';
 import { ImageToPdf } from '@/components/features/image-to-pdf';
 import { PdfToImage } from '@/components/features/pdf-to-image';
 import { SbiCsvConverter } from '@/components/features/sbi-csv-converter';
+import { PortfolioVisualizer } from '@/components/features/portfolio-visualizer';
 
 export default function Home() {
   return (
@@ -21,7 +22,7 @@ export default function Home() {
         <Tabs defaultValue="splitter" className="w-full flex flex-col h-full">
           <div className="w-full border-b bg-muted/10">
             <div className="max-w-7xl mx-auto px-4 md:px-8">
-              <TabsList className="h-12 w-full max-w-2xl bg-transparent p-0 gap-8 justify-start overflow-x-auto">
+              <TabsList className="h-12 w-full max-w-4xl bg-transparent p-0 gap-8 justify-start overflow-x-auto">
                 <TabsTrigger
                   value="splitter"
                   className="h-full rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 text-base whitespace-nowrap"
@@ -46,6 +47,12 @@ export default function Home() {
                 >
                   SBI CSV
                 </TabsTrigger>
+                <TabsTrigger
+                  value="portfolio"
+                  className="h-full rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 text-base whitespace-nowrap"
+                >
+                  Dividend Viz
+                </TabsTrigger>
               </TabsList>
             </div>
           </div>
@@ -62,6 +69,9 @@ export default function Home() {
             </TabsContent>
             <TabsContent value="sbi-csv" className="m-0 h-full border-none ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
               <SbiCsvConverter />
+            </TabsContent>
+            <TabsContent value="portfolio" className="m-0 h-full border-none ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+              <PortfolioVisualizer />
             </TabsContent>
           </div>
         </Tabs>

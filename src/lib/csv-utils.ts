@@ -142,3 +142,58 @@ export function generatePortfolioCsv(data: SbiPortfolioRow[]): string {
 
     return csv;
 }
+
+/**
+ * Reads the formatted "portfolio.csv" (UTF-8, specific headers).
+ */
+export async function loadPortfolioCsv(file: File): Promise<SbiPortfolioRow[]> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+
+        reader.onload = (e) => {
+            try {
+                const text = e.target?.result as string;
+                if (!text) {
+                    reject('Empty file');
+                    return;
+                }
+
+                Papa.parse(text, {
+                    header: true,
+                    skipEmptyLines: true,
+                    complete: (results) => {
+                        const data = results.data as Record<string, any>[];
+                        const portfolio: SbiPortfolioRow[] = [];
+
+                        // Headers: 銘柄コード, 銘柄名称, 株数, 取得価格, 現在値
+                        for (const row of data) {
+                            if (!row['銘柄コード']) continue;
+
+                            const parseNum = (val: string) => {
+                                if (typeof val !== 'string') return typeof val === 'number' ? val : 0;
+                                return parseFloat(val.replace(/,/g, ''));
+                            };
+
+                            portfolio.push({
+                                code: row['銘柄コード'],
+                                name: row['銘柄名称'],
+                                count: parseNum(row['株数']),
+                                avgPrice: parseNum(row['取得価格']),
+                                currentPrice: parseNum(row['現在値']),
+                            });
+                        }
+                        resolve(portfolio);
+                    },
+                    error: (err: any) => reject(err)
+                });
+            } catch (err) {
+                reject(err);
+            }
+        };
+
+        reader.onerror = (err) => reject(err);
+        // Read as Text (assume UTF-8 for the formatted CSV)
+        reader.readAsText(file);
+    });
+}
+
