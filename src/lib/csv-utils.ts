@@ -33,36 +33,74 @@ export async function loadSbiCsv(file: File): Promise<SbiPortfolioRow[]> {
                     type: 'string',
                 });
 
-                // Parse CSV
+                // Parse CSV without assuming first row is header
                 Papa.parse(unicodeString, {
-                    header: true,
+                    header: false,
                     skipEmptyLines: true,
                     complete: (results) => {
-                        const data = results.data as Record<string, any>[];
+                        const rawData = results.data as string[][];
                         const portfolio: SbiPortfolioRow[] = [];
 
-                        // Mapping Logic
-                        // SBI Header Examples: "コード", "銘柄", "保有株数", "取得単価", "現在値"
-                        // Note: SBI CSV sometimes has extra header lines or footer text. 
-                        // PapaParse might treat them as keys if 'header: true'.
-                        // Simple validation: check if 'コード' exists in row.
+                        // 1. Find the header row
+                        // Look for a row that contains "コード" and "銘柄"
+                        let headerRowIndex = -1;
+                        let colMap: Record<string, number> = {};
 
-                        for (const row of data) {
-                            // Basic check to see if this is a valid data row
-                            if (!row['コード'] || !row['銘柄']) continue;
+                        for (let i = 0; i < rawData.length; i++) {
+                            const row = rawData[i];
+                            // Check if this row looks like the header
+                            // We look for 'コード' and '銘柄' as key indicators
+                            const codeIndex = row.findIndex(cell => cell.includes('コード'));
+                            const nameIndex = row.findIndex(cell => cell.includes('銘柄'));
 
-                            // Helper to clean numbers (remove commas, handle localized formats if any)
-                            const parseNum = (val: string) => {
-                                if (typeof val !== 'string') return 0;
-                                return parseFloat(val.replace(/,/g, ''));
+                            if (codeIndex !== -1 && nameIndex !== -1) {
+                                headerRowIndex = i;
+
+                                // Create a column map for robust extraction
+                                // We iterate the header row to find indices of required columns
+                                row.forEach((cell, idx) => {
+                                    if (cell.includes('コード')) colMap['code'] = idx;
+                                    else if (cell.includes('銘柄')) colMap['name'] = idx;
+                                    else if (cell.includes('保有株数') || cell.includes('数量')) colMap['count'] = idx;
+                                    else if (cell.includes('取得単価')) colMap['avgPrice'] = idx;
+                                    else if (cell.includes('現在値')) colMap['currentPrice'] = idx;
+                                });
+                                break;
+                            }
+                        }
+
+                        if (headerRowIndex === -1) {
+                            // Fallback: Log raw data for debugging context (visible in console)
+                            console.warn("Could not find header row. Raw first 3 rows:", rawData.slice(0, 3));
+                            // Try standard hardcoded indices if we can't find header? 
+                            // No, it's safer to return empty and let error handler catch it.
+                            resolve([]);
+                            return;
+                        }
+
+                        // 2. Extract Data
+                        for (let i = headerRowIndex + 1; i < rawData.length; i++) {
+                            const row = rawData[i];
+
+                            // Start processing checks
+                            // We need at least code and name to be valid
+                            if (colMap['code'] === undefined || !row[colMap['code']]) continue;
+
+                            // Helper
+                            const cleanNum = (val: string | undefined): number => {
+                                if (!val) return 0;
+                                // Remove commas, quotes, spaces
+                                const cleaned = val.replace(/[,"]/g, '').trim();
+                                const num = parseFloat(cleaned);
+                                return isNaN(num) ? 0 : num;
                             };
 
                             portfolio.push({
-                                code: row['コード'],
-                                name: row['銘柄'],
-                                count: parseNum(row['保有株数'] || '0'),
-                                avgPrice: parseNum(row['取得単価'] || '0'),
-                                currentPrice: parseNum(row['現在値'] || '0'),
+                                code: row[colMap['code']] || '',
+                                name: row[colMap['name']] || '',
+                                count: cleanNum(row[colMap['count']]),
+                                avgPrice: cleanNum(row[colMap['avgPrice']]),
+                                currentPrice: cleanNum(row[colMap['currentPrice']]),
                             });
                         }
 
