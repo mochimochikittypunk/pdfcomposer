@@ -5,6 +5,7 @@ import axios from 'axios';
 import { loadSbiCsv, loadPortfolioCsv, SbiPortfolioRow } from '@/lib/csv-utils';
 import { CsvDropzone } from '@/components/csv/csv-dropzone';
 import { SummaryCards } from '@/components/portfolio/summary-cards';
+import { AIStockRecommender } from '@/components/features/ai-stock-recommender';
 import { DividendChart } from '@/components/portfolio/dividend-chart';
 import { RankingTable, RankingRow } from '@/components/portfolio/ranking-table';
 import { Button } from '@/components/ui/button';
@@ -147,6 +148,7 @@ export function PortfolioVisualizer() {
         value: item.currentPrice * item.count,
         dividend: item.totalDividend,
         dps: item.dividendPerShare,
+        yieldOnCost: item.avgPrice > 0 ? (item.dividendPerShare / item.avgPrice) * 100 : 0,
         ratio: totalEvaluation > 0 ? ((item.currentPrice * item.count) / totalEvaluation) * 100 : 0
     }));
 
@@ -197,6 +199,9 @@ export function PortfolioVisualizer() {
                             totalDividend={totalDividend}
                             taxedDividend={taxedDividend}
                         />
+
+                        {/* AI Recommendation */}
+                        <AIStockRecommender portfolio={rankingData} />
 
                         <div className="grid gap-8 lg:grid-cols-3">
                             {/* Chart */}

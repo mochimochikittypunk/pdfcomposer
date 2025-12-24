@@ -16,6 +16,7 @@ export interface RankingRow {
     value: number; // 評価額
     ratio: number; // 構成比 %
     dividend: number; // 配当金合計
+    yieldOnCost: number; // 取得単価利回り
     dps: number; // 1株当たり配当
 }
 
@@ -28,41 +29,50 @@ export function RankingTable({ data }: RankingTableProps) {
     const displayData = data;
 
     return (
-        <div className="border rounded-md max-h-[600px] overflow-y-auto">
-            <Table>
-                <TableHeader className="sticky top-0 bg-background z-10">
-                    <TableRow>
-                        <TableHead className="w-[60px]">Rank</TableHead>
-                        <TableHead>Symbol</TableHead>
-                        <TableHead>Name</TableHead>
-                        <TableHead className="text-right">Valuation</TableHead>
-                        <TableHead className="text-right">DPS</TableHead>
-                        <TableHead className="text-right">Dividend (Est)</TableHead>
-                        <TableHead className="text-right">Yield</TableHead>
-                        <TableHead className="text-right">Ratio</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {displayData.map((row, index) => (
-                        <TableRow key={row.code}>
-                            <TableCell className="font-medium text-muted-foreground">{index + 1}</TableCell>
-                            <TableCell>{row.code}</TableCell>
-                            <TableCell className="max-w-[150px] truncate" title={row.name}>{row.name}</TableCell>
-                            <TableCell className="text-right">¥{row.value.toLocaleString()}</TableCell>
-                            <TableCell className="text-right text-muted-foreground">
-                                {row.dps > 0 ? `¥${row.dps}` : '-'}
-                            </TableCell>
-                            <TableCell className="text-right text-muted-foreground">
-                                {row.dividend > 0 ? `¥${row.dividend.toLocaleString()}` : <span className="text-yellow-500">¥0</span>}
-                            </TableCell>
-                            <TableCell className="text-right">
-                                {row.value > 0 ? ((row.dividend / row.value) * 100).toFixed(2) : '0.00'}%
-                            </TableCell>
-                            <TableCell className="text-right">{row.ratio.toFixed(1)}%</TableCell>
+        <div className="flex flex-col gap-2">
+            <div className="border rounded-md max-h-[600px] overflow-y-auto">
+                <Table>
+                    <TableHeader className="sticky top-0 bg-background z-10">
+                        <TableRow>
+                            <TableHead className="w-[60px]">Rank</TableHead>
+                            <TableHead>Symbol</TableHead>
+                            <TableHead>Name</TableHead>
+                            <TableHead className="text-right">Valuation</TableHead>
+                            <TableHead className="text-right">DPS</TableHead>
+                            <TableHead className="text-right">Dividend (Est)</TableHead>
+                            <TableHead className="text-right">Yield (Cost)</TableHead>
+                            <TableHead className="text-right">Yield (Cur)</TableHead>
+                            <TableHead className="text-right">Ratio</TableHead>
                         </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
+                    </TableHeader>
+                    <TableBody>
+                        {displayData.map((row, index) => (
+                            <TableRow key={row.code}>
+                                <TableCell className="font-medium text-muted-foreground">{index + 1}</TableCell>
+                                <TableCell>{row.code}</TableCell>
+                                <TableCell className="max-w-[150px] truncate" title={row.name}>{row.name}</TableCell>
+                                <TableCell className="text-right">¥{row.value.toLocaleString()}</TableCell>
+                                <TableCell className="text-right text-muted-foreground">
+                                    {row.dps > 0 ? `¥${row.dps}` : '-'}
+                                </TableCell>
+                                <TableCell className="text-right text-muted-foreground">
+                                    {row.dividend > 0 ? `¥${row.dividend.toLocaleString()}` : <span className="text-yellow-500">¥0</span>}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                    {row.yieldOnCost.toFixed(2)}%
+                                </TableCell>
+                                <TableCell className="text-right">
+                                    {row.value > 0 ? ((row.dividend / row.value) * 100).toFixed(2) : '0.00'}%
+                                </TableCell>
+                                <TableCell className="text-right">{row.ratio.toFixed(1)}%</TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </div>
+            <p className="text-xs text-muted-foreground text-right">
+                ※ 配当利回り率は自動取得データのため、不正確な場合があります。(IR Bank / Yahoo Finance)
+            </p>
         </div>
     );
 }
