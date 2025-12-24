@@ -16,17 +16,34 @@ export async function GET(request: NextRequest) {
         // IR Bank URL (e.g., https://irbank.net/7203/dividend)
         const url = `https://irbank.net/${code}/dividend`;
 
-        // Fetch HTML
-        // Set User-Agent to avoid being blocked
+        // Fetch HTML as arraybuffer to handle potential Shift-JIS
         const response = await axios.get(url, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
             },
-            timeout: 10000, // 10s timeout
+            timeout: 10000,
+            responseType: 'arraybuffer' // Important for encoding
         });
 
-        const html = response.data;
-        const $ = cheerio.load(html);
+        const buffer = Buffer.from(response.data);
+        // Detect encoding (IR Bank is often UTF-8 now but good to be safe, or headers might define it)
+        // Convert to Unicode string
+        // We use encoding-japanese just like in csv-utils
+        const Encoding = require('encoding-japanese');
+        const unicodeString = Encoding.convert(buffer, {
+            to: 'UNICODE',
+            type: 'string'
+        });
+
+        const $ = cheerio.load(unicodeString);
+
+        // DEBUG: Log title to verify we got the page and it's readable
+        const pageTitle = $('title').text();
+        console.log(`[${code}] Fetched Title: "${pageTitle}" (Length: ${unicodeString.length})`);
+
+        // DEBUG: Dump headers of first table to see what we are dealing with
+        const firstHeader = $('th').first().text();
+        console.log(`[${code}] First TH: "${firstHeader}"`);
 
         // Extraction Logic
         // IR Bank structure for dividend is often in a table with ID "ts" or similar, or just a generic table.
@@ -67,33 +84,107 @@ export async function GET(request: NextRequest) {
 
         // NOTE for User: This is a best-effort scraper.
 
-        // Let's try to grab the content of the `meta[name="description"]` first, 
-        // often it summarizes: "トヨタ自動車(7203)の配当金推移。2025年3月期の予想配当はXXX円..."
-        const description = $('meta[name="description"]').attr('content');
-        if (description) {
-            // Regex to find "予想配当はXXX円"
-            const match = description.match(/予想配当は([0-9.]+)円/);
+        // DEBUG: Logging
+        console.log(`[${code}] DEBUG Title (re-check): "${$('title').text()}"`);
+        const metaDesc = $('meta[name="description"]').attr('content');
+        console.log(`[${code}] DEBUG Meta: "${metaDesc}"`);
+
+        // Check if we even found any tables
+        const tableCount = $('table').length;
+        console.log(`[${code}] DEBUG Tables found: ${tableCount}`);
+        if (tableCount > 0) {
+            console.log(`[${code}] DEBUG Table 0 text (snippet):`, $('table').first().text().substring(0, 100).replace(/\s+/g, ' '));
+        }
+
+        // Strategy 1: Meta Description
+        // Typical format: "トヨタ自動車(7203)の配当金推移。2025年3月期の予想配当は100円..."
+        // Or sometimes: "予想配当は100円(前期比+10円)..."
+        const description = $('meta[name="description"]').attr('content') || '';
+        console.log(`[${code}] Description:`, description);
+
+        // Try standard regex
+        let match = description.match(/予想配当は([0-9.]+(?:,[0-9]{3})*)円/);
+        if (match && match[1]) {
+            dividendValue = parseFloat(match[1].replace(/,/g, ''));
+            console.log(`[${code}] Found via Meta 1:`, dividendValue);
+        }
+
+        // Try extracting from text like "配当金は1株当たりXXX円" if meta fails
+        if (!dividendValue) {
+            match = description.match(/配当金は1株当たり([0-9.]+(?:,[0-9]{3})*)円/);
             if (match && match[1]) {
-                dividendValue = parseFloat(match[1]);
+                dividendValue = parseFloat(match[1].replace(/,/g, ''));
+                console.log(`[${code}] Found via Meta 2:`, dividendValue);
             }
         }
 
-        if (!dividendValue || isNaN(dividendValue)) {
-            // Fallback: Parse table
-            // Find a cell with "予想" and get the value from the corresponding "1株配当" column.
-            // This is complex to guess blind. 
-            // Let's rely on the meta description usually being reliable for IR Bank.
-            // If that fails, we return 0 or null to indicate "Unknown".
+        // Strategy 2: Table Parsing (Relaxed Strictness)
+        // Strategy 2: Table Parsing (Smart Column Indexing)
+        if (!dividendValue) {
+            $('table').each((index, table) => {
+                // Check headers to find the "Total" or "Dividend" column index
+                let dividendColIndex = -1;
 
-            // Another try: look for the most generic number in a "dividend" context.
-            // (Omitted for safety to avoid garbage data)
+                // Headers might be in thead or first row
+                let headers = $(table).find('th');
+                if (headers.length === 0) {
+                    headers = $(table).find('tr').first().find('td');
+                }
+
+                headers.each((idx, el) => {
+                    const text = $(el).text().replace(/\s+/g, '');
+                    // '合計' is common for Total Dividend
+                    if (text === '合計' || text.includes('配当金') || text === '1株配当') {
+                        dividendColIndex = idx;
+                    }
+                });
+
+                if (dividendColIndex !== -1) {
+                    $(table).find('tr').each((rowIndex, row) => {
+                        const cells = $(row).find('td');
+                        if (cells.length === 0) return;
+
+                        const firstCellText = cells.eq(0).text().trim();
+                        // Check if first cell is a Year (e.g. 2025年3月)
+                        const isYear = /[0-9]{4}年/.test(firstCellText);
+
+                        // If it's a year, standard indexing.
+                        // If NOT a year (e.g. "予想", "修正", "実績"), likely rowspan on Year, so partial row.
+                        // However, we need to be careful. IR Bank rows usually are: [Year, Type, ...].
+                        // If Year is spanned, [Type, ...]. So shift is -1.
+                        const offset = isYear ? 0 : -1;
+
+                        // Row validation: must contain Forecast/Revision/Actual AND likely be valid data
+                        const rowText = $(row).text();
+                        if (rowText.includes('予想') || rowText.includes('修正') || rowText.includes('(予)')) {
+
+                            const targetIndex = dividendColIndex + offset;
+                            if (targetIndex >= 0 && targetIndex < cells.length) {
+                                const targetCell = cells.eq(targetIndex);
+                                const cellText = targetCell.text().trim();
+
+                                // Remove '円', ',', ' '
+                                const cleanText = cellText.replace(/[円, ]/g, '');
+                                const val = parseFloat(cleanText);
+
+                                if (!isNaN(val) && val > 0) {
+                                    // We keep matching to find the *latest* (bottom-most) valid entry
+                                    // But we prefer "Forecast" or "Revision" over "Actual" if both exist for same year?
+                                    // Actually, iterating top-down, the bottom-most is usually the latest data.
+                                    dividendValue = val;
+                                    console.log(`[${code}] Candidate dividend found: ${val} (Row ${rowIndex}, Type: ${isYear ? 'Year' : 'Partial'})`);
+                                }
+                            }
+                        }
+                    });
+                }
+            });
         }
 
-        // Also extract Company Name if possible
+        // Also extract Company Name
         let companyName = '';
-        const title = $('title').text(); // "XXXX(code)の配当金..."
+        const title = $('title').text();
         if (title) {
-            // Extract "XXXX" from "XXXX(code)..."
             const titleMatch = title.match(/^(.+)\([0-9]{4}\)/);
             if (titleMatch && titleMatch[1]) {
                 companyName = titleMatch[1];
@@ -102,13 +193,19 @@ export async function GET(request: NextRequest) {
 
         return NextResponse.json({
             symbol: code,
-            dividend: dividendValue, // 0 if not found
+            dividend: dividendValue || 0,
             companyName: companyName,
             source: 'IR Bank'
         });
 
-    } catch (error) {
-        console.error('Scraping error:', error);
-        return NextResponse.json({ error: 'Failed to fetch dividend data' }, { status: 500 });
+    } catch (error: any) {
+        console.error(`Scraping error for code ${code}:`, error.message);
+        // Return 0 dividend instead of 500 error to allow frontend to proceed gracefully
+        return NextResponse.json({
+            symbol: code,
+            dividend: 0,
+            error: error.message || 'Unknown error',
+            companyName: ''
+        }, { status: 200 });
     }
 }

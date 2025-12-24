@@ -158,28 +158,65 @@ export async function loadPortfolioCsv(file: File): Promise<SbiPortfolioRow[]> {
                     return;
                 }
 
+                // Check for minimal headers to accept this format
+                // If it doesn't look like our targeted CSV, reject so we can fall back to loadSbiCsv
+                // Common tokens: "コード", "銘柄", "保有"
+                if (!text.includes('コード') && !text.includes('銘柄')) {
+                    resolve([]); // Not a recognizable format, let fallback handle it
+                    return;
+                }
+
                 Papa.parse(text, {
                     header: true,
                     skipEmptyLines: true,
+                    delimitersToGuess: [',', '\t', '|', ';', ' '], // Aggressive guessing
+                    transformHeader: (h) => h.trim(), // Ensure headers are trimmed
                     complete: (results) => {
                         const data = results.data as Record<string, any>[];
                         const portfolio: SbiPortfolioRow[] = [];
 
-                        // Headers: 銘柄コード, 銘柄名称, 株数, 取得価格, 現在値
-                        for (const row of data) {
-                            if (!row['銘柄コード']) continue;
+                        // DEBUG: Log first row to help diagnose header issues
+                        if (data.length > 0) {
+                            console.log('Parsed CSV First Row keys:', Object.keys(data[0]));
+                            console.log('Parsed CSV First Row sample:', data[0]);
+                        }
 
-                            const parseNum = (val: string) => {
-                                if (typeof val !== 'string') return typeof val === 'number' ? val : 0;
-                                return parseFloat(val.replace(/,/g, ''));
+                        for (const row of data) {
+                            // Try to find Code
+                            const code = row['銘柄コード'] || row['コード'] || row['code'] || row['Symbol'];
+                            if (!code) continue;
+
+                            // Try to find Name
+                            const name = row['銘柄名称'] || row['銘柄名'] || row['銘柄'] || row['Name'] || '';
+
+                            const parseNum = (keys: string[]) => {
+                                let val: any = undefined;
+                                for (const key of keys) {
+                                    if (row[key] !== undefined) {
+                                        val = row[key];
+                                        break;
+                                    }
+                                }
+                                if (!val) return 0;
+                                if (typeof val === 'number') return val;
+                                // Remove everything that is NOT a digit, dot, or minus sign
+                                // This handles '¥1,234' -> '1234', '1,234円' -> '1234'
+                                const str = String(val).replace(/[^0-9.-]/g, '');
+                                const num = parseFloat(str);
+                                return isNaN(num) ? 0 : num;
                             };
 
+                            // Support various headers for formatted CSV
+                            const count = parseNum(['株数', '保有株数', '保有数', '数量', 'Quantity', 'Shares']);
+                            const avgPrice = parseNum(['取得価格', '取得単価', '平均取得単価', 'Price', 'Avg Price']);
+                            const currentPrice = parseNum(['現在値', '時価', '現在価格', 'Current Value', 'Close']);
+
                             portfolio.push({
-                                code: row['銘柄コード'],
-                                name: row['銘柄名称'],
-                                count: parseNum(row['株数']),
-                                avgPrice: parseNum(row['取得価格']),
-                                currentPrice: parseNum(row['現在値']),
+                                code: String(code).trim(),
+                                name: String(name).trim(),
+                                count,
+                                avgPrice,
+                                currentPrice,
                             });
                         }
                         resolve(portfolio);
@@ -192,8 +229,6 @@ export async function loadPortfolioCsv(file: File): Promise<SbiPortfolioRow[]> {
         };
 
         reader.onerror = (err) => reject(err);
-        // Read as Text (assume UTF-8 for the formatted CSV)
         reader.readAsText(file);
     });
 }
-

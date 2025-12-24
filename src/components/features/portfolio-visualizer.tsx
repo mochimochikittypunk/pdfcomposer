@@ -122,16 +122,31 @@ export function PortfolioVisualizer() {
     // Chart Data (Group small items?)
     // Sort by evaluation value for the chart
     const sortedData = [...data].sort((a, b) => (b.currentPrice * b.count) - (a.currentPrice * a.count));
-    const chartData = sortedData.map(item => ({
+
+    // Take top 8 and group the rest as "Others"
+    const topSegments = sortedData.slice(0, 8);
+    const others = sortedData.slice(8);
+    const othersValue = others.reduce((sum, item) => sum + (item.currentPrice * item.count), 0);
+
+    const chartData = topSegments.map(item => ({
         name: item.name,
         value: item.currentPrice * item.count
     }));
+
+    if (othersValue > 0) {
+        chartData.push({
+            name: 'Others',
+            value: othersValue
+        });
+    }
 
     // Ranking Data
     const rankingData: RankingRow[] = sortedData.map(item => ({
         code: item.code,
         name: item.name,
         value: item.currentPrice * item.count,
+        dividend: item.totalDividend,
+        dps: item.dividendPerShare,
         ratio: totalEvaluation > 0 ? ((item.currentPrice * item.count) / totalEvaluation) * 100 : 0
     }));
 
