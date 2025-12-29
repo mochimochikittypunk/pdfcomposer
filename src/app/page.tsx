@@ -7,6 +7,7 @@ import { ImageToPdf } from '@/components/features/image-to-pdf';
 import { PdfToImage } from '@/components/features/pdf-to-image';
 import { SbiCsvConverter } from '@/components/features/sbi-csv-converter';
 import { PortfolioVisualizer } from '@/components/features/portfolio-visualizer';
+import { AeroPressTimer } from '@/components/features/aeropress-timer';
 
 export default function Home() {
   return (
@@ -53,6 +54,12 @@ export default function Home() {
                 >
                   Dividend Viz
                 </TabsTrigger>
+                <TabsTrigger
+                  value="timer"
+                  className="h-full rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 text-base whitespace-nowrap"
+                >
+                  AeroPress Timer
+                </TabsTrigger>
               </TabsList>
             </div>
           </div>
@@ -72,6 +79,9 @@ export default function Home() {
             </TabsContent>
             <TabsContent value="portfolio" className="m-0 h-full border-none ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
               <PortfolioVisualizer />
+            </TabsContent>
+            <TabsContent value="timer" className="m-0 h-full border-none ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+              <AeroPressTimer />
             </TabsContent>
           </div>
         </Tabs>
