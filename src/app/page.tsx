@@ -8,6 +8,8 @@ import { PdfToImage } from '@/components/features/pdf-to-image';
 import { SbiCsvConverter } from '@/components/features/sbi-csv-converter';
 import { PortfolioVisualizer } from '@/components/features/portfolio-visualizer';
 import { AeroPressTimer } from '@/components/features/aeropress-timer';
+import { PdfToCsvConverter } from '@/components/features/pdf-to-csv-converter';
+import { PdfOverlayEditor } from '@/components/features/pdf-overlay-editor';
 
 export default function Home() {
   return (
@@ -23,7 +25,7 @@ export default function Home() {
         <Tabs defaultValue="splitter" className="w-full flex flex-col h-full">
           <div className="w-full border-b bg-muted/10">
             <div className="max-w-7xl mx-auto px-4 md:px-8">
-              <TabsList className="h-12 w-full max-w-4xl bg-transparent p-0 gap-8 justify-start overflow-x-auto">
+              <TabsList className="h-auto w-full bg-transparent p-0 gap-4 justify-start flex-wrap">
                 <TabsTrigger
                   value="splitter"
                   className="h-full rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 text-base whitespace-nowrap"
@@ -60,6 +62,18 @@ export default function Home() {
                 >
                   AeroPress Timer
                 </TabsTrigger>
+                <TabsTrigger
+                  value="pdf-to-csv"
+                  className="h-full rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 text-base whitespace-nowrap"
+                >
+                  PDF to CSV
+                </TabsTrigger>
+                <TabsTrigger
+                  value="pdf-editor"
+                  className="h-full rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 text-base whitespace-nowrap"
+                >
+                  PDF Editor
+                </TabsTrigger>
               </TabsList>
             </div>
           </div>
@@ -82,6 +96,12 @@ export default function Home() {
             </TabsContent>
             <TabsContent value="timer" className="m-0 h-full border-none ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
               <AeroPressTimer />
+            </TabsContent>
+            <TabsContent value="pdf-to-csv" className="m-0 h-full border-none ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+              <PdfToCsvConverter />
+            </TabsContent>
+            <TabsContent value="pdf-editor" className="m-0 h-full border-none ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+              <PdfOverlayEditor />
             </TabsContent>
           </div>
         </Tabs>
