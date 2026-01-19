@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, Download, Trash2, Type } from 'lucide-react';
+import { Upload, Download, Trash2, Type, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -41,6 +41,7 @@ interface Annotation {
     useWhiteBox: boolean;
     boxWidth: number;
     boxHeight: number;
+    alignment: 'left' | 'center' | 'right';
 }
 
 // Cache for loaded fonts
@@ -161,6 +162,7 @@ export function PdfOverlayEditor() {
             useWhiteBox: true,
             boxWidth: 80,
             boxHeight: 20,
+            alignment: 'right', // Default to right alignment
         };
 
         setAnnotations(prev => [...prev, newAnnotation]);
@@ -218,6 +220,7 @@ export function PdfOverlayEditor() {
             id: `ann-${Date.now()}`,
             x: ann.x + 2, // Slight offset
             y: ann.y + 2, // Slight offset
+            alignment: ann.alignment || 'right', // Copy alignment or default
         };
 
         setAnnotations(prev => [...prev, newAnnotation]);
@@ -271,13 +274,13 @@ export function PdfOverlayEditor() {
                 // Note: ann.y is percentage from top
                 const pdfY = height - ((ann.y / 100) * height);
 
-                if (ann.useWhiteBox) {
-                    // Box size calculation:
-                    // ann.boxWidth/Height are in screen pixels.
-                    // We need to scale them to PDF coordinate system.
-                    const boxWidthPdf = ann.boxWidth * scaleFactor;
-                    const boxHeightPdf = ann.boxHeight * scaleFactor;
+                // Box size calculation:
+                // ann.boxWidth/Height are in screen pixels.
+                // We need to scale them to PDF coordinate system.
+                const boxWidthPdf = ann.boxWidth * scaleFactor;
+                const boxHeightPdf = ann.boxHeight * scaleFactor;
 
+                if (ann.useWhiteBox) {
                     page.drawRectangle({
                         x: pdfX,
                         y: pdfY - boxHeightPdf, // Draw up from the bottom-left corner
@@ -298,9 +301,19 @@ export function PdfOverlayEditor() {
                     // Let's try applying the scaleFactor to keep it proportional to the white box.
                     const scaledFontSize = ann.fontSize * scaleFactor;
 
+                    // Calculate text width for alignment
+                    const textWidth = font.widthOfTextAtSize(ann.text, scaledFontSize);
+                    let xOffset = 2 * scaleFactor; // Default padding for left alignment
+
+                    if (ann.alignment === 'center') {
+                        xOffset = (boxWidthPdf - textWidth) / 2;
+                    } else if (ann.alignment === 'right') {
+                        xOffset = boxWidthPdf - textWidth - (2 * scaleFactor);
+                    }
+
                     page.drawText(ann.text, {
-                        x: pdfX + (2 * scaleFactor), // Scale the padding too
-                        y: pdfY - scaledFontSize - (2 * scaleFactor), // Adjust baseline: move down by font size + padding
+                        x: pdfX + xOffset, // Apply alignment offset
+                        y: pdfY - scaledFontSize - (2 * scaleFactor),
                         size: scaledFontSize,
                         font: font,
                         color: rgb(0, 0, 0),
@@ -441,7 +454,10 @@ export function PdfOverlayEditor() {
                                         style={{
                                             fontSize: ann.fontSize,
                                             fontFamily: getFontFamily(ann.fontId),
-                                            padding: '2px',
+                                            padding: '2px 4px', // Add horizontal padding
+                                            width: ann.boxWidth, // Enforce width for alignment
+                                            textAlign: ann.alignment || 'right', // Apply alignment
+                                            pointerEvents: 'none',
                                         }}
                                     >
                                         {ann.text}
@@ -536,6 +552,36 @@ export function PdfOverlayEditor() {
                                         min={6}
                                         max={72}
                                     />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label>文字揃え</Label>
+                                    <div className="flex items-center gap-1 border rounded-md p-1">
+                                        <Button
+                                            variant={selectedAnn.alignment === 'left' ? 'secondary' : 'ghost'}
+                                            size="sm"
+                                            className="flex-1"
+                                            onClick={() => updateAnnotation(selectedAnn.id, { alignment: 'left' })}
+                                        >
+                                            <AlignLeft className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            variant={selectedAnn.alignment === 'center' ? 'secondary' : 'ghost'}
+                                            size="sm"
+                                            className="flex-1"
+                                            onClick={() => updateAnnotation(selectedAnn.id, { alignment: 'center' })}
+                                        >
+                                            <AlignCenter className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            variant={selectedAnn.alignment === 'right' ? 'secondary' : 'ghost'}
+                                            size="sm"
+                                            className="flex-1"
+                                            onClick={() => updateAnnotation(selectedAnn.id, { alignment: 'right' })}
+                                        >
+                                            <AlignRight className="h-4 w-4" />
+                                        </Button>
+                                    </div>
                                 </div>
 
                                 <div className="flex items-center justify-between">
